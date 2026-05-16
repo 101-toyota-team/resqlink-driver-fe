@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/splash_screen.dart';
-import 'themes/app_theme.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +42,13 @@ class ResQLinkDriverApp extends StatelessWidget {
     return MaterialApp(
       title: 'ResQLink Driver',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
+      theme: ThemeData(
+        useMaterial3: true,
+        // 2. Ganti seluruh TextTheme default aplikasi menjadi Poppins
+        textTheme: GoogleFonts.poppinsTextTheme(
+          Theme.of(context).textTheme,
+        ),
+      ),
       home: const SplashScreen(),
     );
   }

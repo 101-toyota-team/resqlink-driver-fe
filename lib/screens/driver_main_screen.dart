@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../widgets/order_request_card.dart';
+import '../widgets/order/order_request_card.dart';
 import '../../widgets/driver_navigation_sheet.dart';
-import '../../widgets/driver_qris_view.dart';
+import '../widgets/order/driver_qris_view.dart';
+import '../../widgets/order/driver_map_placeholder.dart';
 
 class DriverMainScreen extends StatelessWidget {
   final int currentStep;
@@ -18,7 +19,10 @@ class DriverMainScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF3DE),
       appBar: AppBar(
-        title: Text(_getAppBarTitle(), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(
+          _getAppBarTitle(), 
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)
+        ),
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
@@ -43,6 +47,7 @@ class DriverMainScreen extends StatelessWidget {
   }
 
   Widget _buildCurrentStepView(BuildContext context) {
+    // Tahap 4: Tampilan penuh QRIS tanpa komponen peta di atasnya
     if (currentStep == 4) {
       return DriverQrisView(
         onFinish: () {
@@ -51,9 +56,11 @@ class DriverMainScreen extends StatelessWidget {
       );
     }
 
+    // Tahap 1, 2, dan 3: Tampilan Peta + Bottom Sheet Aksi Supir
     return Stack(
       children: [
-        _buildMapPlaceholder(context, _getMapText()),
+        // MEMANGGIL WIDGET MAP YANG SUDAH DIREFACTOR
+        DriverMapPlaceholder(text: _getMapText()),
         Positioned(
           bottom: 0, left: 0, right: 0,
           child: _buildBottomWidget(),
@@ -96,23 +103,5 @@ class DriverMainScreen extends StatelessWidget {
       default:
         return const SizedBox.shrink();
     }
-  }
-
-  Widget _buildMapPlaceholder(BuildContext context, String text) {
-    return Container(
-      width: double.infinity,
-      height: MediaQuery.of(context).size.height * 0.6,
-      color: Colors.grey[300],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.map_outlined, size: 40, color: Colors.grey),
-            const SizedBox(height: 8),
-            Text(text, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
   }
 }
