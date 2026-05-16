@@ -43,7 +43,6 @@ class DriverMainScreen extends StatelessWidget {
   }
 
   Widget _buildCurrentStepView(BuildContext context) {
-    // Jika berada di langkah akhir (4), tampilkan QRIS secara penuh tanpa peta
     if (currentStep == 4) {
       return DriverQrisView(
         onFinish: () {
@@ -52,7 +51,6 @@ class DriverMainScreen extends StatelessWidget {
       );
     }
 
-    // Selain step 4, tampilkan kombinasi peta (atas) dan panel aksi (bawah)
     return Stack(
       children: [
         _buildMapPlaceholder(context, _getMapText()),
