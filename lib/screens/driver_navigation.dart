@@ -3,6 +3,7 @@ import 'package:resqlink_driver/screens/driver_main_screen.dart';
 import 'package:resqlink_driver/screens/driver_home_screen.dart';
 import 'package:resqlink_driver/screens/driver_activity_screen.dart';
 import '../../widgets/driver_bottom_nav.dart'; 
+import '../../widgets/order/order_request_card.dart';
 
 
 class DriverNavigation extends StatefulWidget {
@@ -17,7 +18,7 @@ class _DriverNavigationState extends State<DriverNavigation> {
 
   // GLOBAL STATE UNTUK MENGONTROL ALUR TUGAS
   // 0: Standby Kosong (Tidak ada tugas)
-  // 1: Di-assign Provider (Muncul Card Tugas Aktif di Home)
+  // 1: Di-assign Provider (Muncul Popup Tugas Aktif)
   // 2: Menuju Lokasi Pasien (Sedang di Jalan)
   // 3: Menuju Rumah Sakit (Sedang di Jalan)
   // 4: Selesaikan Pembayaran (QRIS)
@@ -33,9 +34,7 @@ class _DriverNavigationState extends State<DriverNavigation> {
           DriverHomeScreen(
             currentStep: _currentDriverStep,
             onSimulateAssignment: () {
-              setState(() {
-                _currentDriverStep = 1; // Menyimulasikan tugas masuk dari provider
-              });
+              _showNewAssignmentDialog();
             },
             onOpenTaskRoute: () {
               _navigateToMainRoute();
@@ -53,6 +52,26 @@ class _DriverNavigationState extends State<DriverNavigation> {
             _selectedTabIndex = index;
           });
         },
+      ),
+    );
+  }
+
+  void _showNewAssignmentDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        child: OrderRequestCard(
+          onAccept: () {
+            Navigator.pop(context); // Tutup Dialog
+            setState(() {
+              _currentDriverStep = 2; // Langsung ke tahap Menuju Lokasi Pasien
+            });
+            _navigateToMainRoute(); // Pindah ke halaman navigasi aktif
+          },
+        ),
       ),
     );
   }

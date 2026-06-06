@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../themes/app_typography.dart';
+import 'login_screen.dart';
+import 'notification_screen.dart';
 import '../../widgets/home/driver_hero_performance_card.dart';
 import '../../widgets/home/driver_ongoing_task_card.dart';
 import '../../widgets/home/driver_standby_radar_button.dart';
@@ -22,25 +26,54 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _isStandby = false;
+  String _driverName = "Mitra ResQLink";
+
+  @override
+  void initState() {
+    super.initState();
+    _getDriverInfo();
+  }
+
+  void _getDriverInfo() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      setState(() {
+        _driverName = user.userMetadata?['full_name'] ?? 
+                      user.userMetadata?['name'] ?? 
+                      user.email?.split('@')[0] ?? 
+                      "Mitra ResQLink";
+      });
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    await Supabase.instance.client.auth.signOut();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF3DE), 
+      backgroundColor: const Color(0xFFF6F7F9),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeroHeaderSection(),
-              
+              _buildTopBar(),
+              _buildGreetingSection(),
               const DriverHeroPerformanceCard(),
-              
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 12),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: widget.currentStep > 0 
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: widget.currentStep >= 2 
                     ? DriverOngoingTaskCard(
                         currentStep: widget.currentStep,
                         onOpenTaskRoute: widget.onOpenTaskRoute,
@@ -50,12 +83,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         onSimulateAssignment: widget.onSimulateAssignment,
                       ),
               ),
-
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 24),
               const DriverTipsCard(),
-              
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -63,63 +93,80 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildHeroHeaderSection() {
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFFFF3DE),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildTopBar(),
-          _buildGreetingSection(),
+          Image.asset(
+            'assets/images/ResQLink_Logo.png', 
+            width: 110, height: 36, 
+            fit: BoxFit.contain
+          ),
+          Row(
+            children: [
+              _buildStatusToggle(),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _handleLogout,
+                icon: const Icon(Icons.logout_rounded, color: Color(0xFF757575), size: 22),
+                tooltip: "Keluar Akun",
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+  Widget _buildStatusToggle() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _isStandby ? const Color(0xFF00AA13).withValues(alpha:0.1) : Colors.white,
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(
+          color: _isStandby ? const Color(0xFF00AA13).withValues(alpha: 0.3) : const Color(0xFFE8E8E8), 
+          width: 1.2
+        ),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset(
-            'assets/images/ResQLink_Logo.png', 
-            width: 110, height: 35, 
-            fit: BoxFit.contain
-          ),
-          const Spacer(),
           Container(
-            padding: const EdgeInsets.only(left: 12, right: 2, top: 2, bottom: 2),
+            width: 8, height: 8,
             decoration: BoxDecoration(
-              color: _isStandby ? const Color(0xFFE2FBE9) : Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: _isStandby ? Colors.green.shade400 : Colors.grey.shade300, 
-                width: 1.2
-              ),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
-              ]
+              color: _isStandby ? const Color(0xFF00AA13) : const Color(0xFFBDBDBD),
+              shape: BoxShape.circle,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _isStandby ? "SIAP SIAGA" : "ISTIRAHAT",
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: _isStandby ? Colors.green.shade800 : Colors.grey.shade700, letterSpacing: 0.3),
-                ),
-                Transform.scale(
-                  scale: 0.7,
-                  child: Switch(
-                    value: _isStandby,
-                    onChanged: (value) {
-                      setState(() { _isStandby = value; });
-                    },
-                    activeColor: Colors.green.shade700,
-                    activeTrackColor: Colors.green.shade200,
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _isStandby ? "AKTIF" : "OFFLINE",
+            style: AppTypography.captionSmall.copyWith(
+              fontWeight: FontWeight.w900,
+              color: _isStandby ? const Color(0xFF00AA13) : const Color(0xFF4A4A4A),
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 20,
+            width: 32,
+            child: Transform.scale(
+              scale: 0.7,
+              child: Switch(
+                value: _isStandby,
+                onChanged: (value) {
+                  setState(() { _isStandby = value; });
+                },
+                activeThumbColor: const Color(0xFF00AA13),
+                activeTrackColor: const Color(0xFF00AA13).withValues(alpha: 0.2),
+                inactiveThumbColor: const Color(0xFF9E9E9E),
+                inactiveTrackColor: const Color(0xFFE0E0E0),
+                trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+              ),
             ),
           ),
         ],
@@ -129,15 +176,57 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Widget _buildGreetingSection() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      child: Row(
         children: [
-          const Text('Selamat Tugas,', style: TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 2),
-          Text(
-            "Budi Santoso", 
-            style: const TextStyle(fontSize: 24, color: Colors.black87, fontWeight: FontWeight.w800, letterSpacing: -0.5)
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E0E0),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: const Icon(Icons.person_rounded, color: Color(0xFF757575), size: 32),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Halo, $_driverName", 
+                  style: AppTypography.h3.copyWith(
+                    fontSize: 20,
+                    color: const Color(0xFF1C1C1C),
+                  ),
+                ),
+                Text(
+                  'Siap melayani darurat hari ini?',
+                  style: AppTypography.caption.copyWith(
+                    color: const Color(0xFF757575),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationScreen()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFF0F0F0)),
+              ),
+              child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF4A4A4A), size: 24),
+            ),
           ),
         ],
       ),

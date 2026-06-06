@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../themes/app_colors.dart';
+import '../../themes/app_typography.dart';
 
 class ActivityRouteInfo extends StatelessWidget {
   final IconData icon;
@@ -16,13 +18,27 @@ class ActivityRouteInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
-        const SizedBox(width: 8),
-        Text("$label: ", style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppColors.textGrey.withValues(alpha: 0.05),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 14, color: AppColors.textGrey),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          "$label: ", 
+          style: AppTypography.caption.copyWith(fontSize: 13, color: AppColors.textGrey),
+        ),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+            style: AppTypography.body.copyWith(
+              fontSize: 13, 
+              fontWeight: FontWeight.w700, 
+              color: AppColors.textDark,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),

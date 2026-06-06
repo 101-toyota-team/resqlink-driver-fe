@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../themes/app_colors.dart';
+import '../../themes/app_typography.dart';
 
 class DriverTipsCard extends StatelessWidget {
   const DriverTipsCard({super.key});
@@ -8,25 +10,40 @@ class DriverTipsCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF9EE),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF9E5C11).withOpacity(0.15), width: 1.2),
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.divider, width: 1.5),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.info_outline_rounded, color: Color(0xFF9E5C11), size: 22),
-            const SizedBox(width: 12),
-            const Expanded(
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.tips_and_updates_outlined, color: AppColors.amber, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Sistem Otomatis Aktif", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
-                  SizedBox(height: 2),
+                  Text(
+                    "Sistem Otomatis Aktif", 
+                    style: AppTypography.title.copyWith(fontSize: 14)
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     "Pastikan status Anda tetap 'Siap Siaga' agar provider dapat langsung mengalokasikan darurat terdekat.",
-                    style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
+                    style: AppTypography.body.copyWith(
+                      fontSize: 12,
+                      color: AppColors.textGrey,
+                      height: 1.5,
+                    ),
                   ),
                 ],
               ),
