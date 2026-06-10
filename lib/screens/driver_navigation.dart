@@ -5,8 +5,8 @@ import 'package:resqlink_driver/screens/driver_home_screen.dart';
 import 'package:resqlink_driver/screens/driver_activity_screen.dart';
 import 'package:resqlink_driver/services/driver_service.dart';
 import 'package:resqlink_driver/services/location_service.dart';
-import '../../widgets/driver_bottom_nav.dart'; 
-import '../../widgets/order/order_request_card.dart';
+import '../widgets/driver_bottom_nav.dart'; 
+import '../widgets/order/order_request_card.dart';
 
 
 class DriverNavigation extends StatefulWidget {
@@ -27,27 +27,45 @@ class _DriverNavigationState extends State<DriverNavigation> {
   int _currentDriverStep = 0;
   Booking? _activeBooking;
 
-  void _onStepChanged(int nextStep) {
+  Future<void> _onStepChanged(int nextStep) async {
     setState(() {
       _currentDriverStep = nextStep;
     });
 
     if (_activeBooking != null) {
-      String status;
+      String? status;
       switch (nextStep) {
-        case 2: status = 'en_route'; break;
-        case 3: 
-          // Set ke 'arrived' dulu, lalu ke 'to_hospital'
-          DriverService.updateBookingStatus(_activeBooking!.id, 'arrived')
-              .catchError((e) => debugPrint('Error update status arrived: $e'));
-          status = 'to_hospital'; 
+        case 2: 
+          status = 'en_route'; 
           break;
-        case 0: status = 'completed'; break;
-        default: return;
+        case 3: 
+          // Sampai di lokasi penjemputan, lalu mulai perjalanan ke RS
+          try {
+            await DriverService.updateBookingStatus(_activeBooking!.id, 'arrived');
+            status = 'to_hospital';
+          } catch (e) {
+            debugPrint('Error update status arrived: $e');
+            status = 'to_hospital'; // Tetap lanjut ke to_hospital
+          }
+          break;
+        case 4:
+          // Sampai di rumah sakit tujuan
+          status = 'arrived';
+          break;
+        case 0: 
+          status = 'completed'; 
+          break;
+        default: 
+          return;
       }
       
-      DriverService.updateBookingStatus(_activeBooking!.id, status)
-          .catchError((e) => debugPrint('Error update status: $e'));
+      if (status != null) {
+        try {
+          await DriverService.updateBookingStatus(_activeBooking!.id, status);
+        } catch (e) {
+          debugPrint('Error update status $status: $e');
+        }
+      }
 
       if (nextStep == 2 || nextStep == 3) {
         LocationService.startTracking(_activeBooking!.id);
@@ -66,9 +84,9 @@ class _DriverNavigationState extends State<DriverNavigation> {
           // TAB 0: BERANDA UTAMA
           DriverHomeScreen(
             currentStep: _currentDriverStep,
-            onStartAssignment: (booking) {
+            onStartAssignment: (booking) async {
               setState(() => _activeBooking = booking);
-              _onStepChanged(2); // Set status ke en_route
+              await _onStepChanged(2); // Tunggu status en_route berhasil diupdate
               _navigateToMainRoute();
             },
             onOpenTaskRoute: () {
@@ -103,12 +121,14 @@ class _DriverNavigationState extends State<DriverNavigation> {
               return DriverMainScreen(
                 currentStep: _currentDriverStep,
                 booking: _activeBooking!,
-                onStepChanged: (nextStep) {
-                  _onStepChanged(nextStep);
-                  setModalState(() {});
-                  if (nextStep == 0) {
-                    setState(() => _activeBooking = null);
-                    Navigator.pop(context);
+                onStepChanged: (nextStep) async {
+                  await _onStepChanged(nextStep);
+                  if (mounted) {
+                    setModalState(() {});
+                    if (nextStep == 0) {
+                      setState(() => _activeBooking = null);
+                      Navigator.pop(context);
+                    }
                   }
                 },
               );

@@ -38,28 +38,29 @@ class DriverService {
   }
 
   static Map<String, String> _getHeaders(String token) {
-    final headers = {
+    return {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
     };
-    if (_apiKey != null) {
-      headers['apikey'] = _apiKey!;
-    }
-    return headers;
   }
 
   static Future<List<dynamic>> getDriverAssignments() async {
     final token = await _getValidToken;
     if (token == null) throw Exception('Not authenticated');
 
+    final url = Uri.parse('$_baseUrl/driver/assignments');
+    debugPrint('DEBUG: Calling GET $url');
+    
     final response = await http.get(
-      Uri.parse('$_baseUrl/driver/assignments'),
+      url,
       headers: _getHeaders(token),
     );
 
+    debugPrint('DEBUG: GET $url returned ${response.statusCode}');
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
+      debugPrint('DEBUG: GET $url failed: ${response.body}');
       throw Exception('Failed to fetch assignments: ${response.statusCode} - ${response.body}');
     }
   }
@@ -68,13 +69,18 @@ class DriverService {
     final token = await _getValidToken;
     if (token == null) throw Exception('Not authenticated');
 
+    final url = Uri.parse('$_baseUrl/bookings/$bookingId/status');
+    debugPrint('DEBUG: Calling PUT $url with status: $status');
+
     final response = await http.put(
-      Uri.parse('$_baseUrl/bookings/$bookingId/status'),
+      url,
       headers: _getHeaders(token),
       body: jsonEncode({'status': status}),
     );
 
+    debugPrint('DEBUG: PUT $url returned ${response.statusCode}');
     if (response.statusCode != 200) {
+      debugPrint('DEBUG: PUT $url failed: ${response.body}');
       throw Exception('Failed to update booking status: ${response.statusCode} - ${response.body}');
     }
   }
@@ -101,6 +107,7 @@ class DriverService {
     };
 
     try {
+      debugPrint('DEBUG: Calling POST $url for booking $bookingId');
       final response = await http.post(
         url,
         headers: _getHeaders(token),
@@ -108,10 +115,10 @@ class DriverService {
       );
 
       if (response.statusCode != 200) {
-        debugPrint('Failed to update location: ${response.statusCode} - ${response.body}');
+        debugPrint('DEBUG: POST $url failed: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      debugPrint('Error updating location: $e');
+      debugPrint('DEBUG: Error updating location: $e');
     }
   }
 
@@ -120,6 +127,7 @@ class DriverService {
     if (token == null) return;
 
     final url = Uri.parse('$_baseUrl/driver/status');
+    debugPrint('DEBUG: Calling PUT $url with online: $online');
     try {
       final response = await http.put(
         url,
@@ -127,7 +135,9 @@ class DriverService {
         body: jsonEncode({'online': online}),
       );
 
+      debugPrint('DEBUG: PUT $url returned ${response.statusCode}');
       if (response.statusCode != 200) {
+        debugPrint('DEBUG: PUT $url failed: ${response.body}');
         throw Exception('Failed to update status: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
