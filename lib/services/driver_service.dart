@@ -72,12 +72,41 @@ class DriverService {
     }
   }
 
+  static Future<String?> _getProviderToken() async {
+    try {
+      final url = Uri.parse('https://oddfremdisrivnepklga.supabase.co/auth/v1/token?grant_type=password');
+      final response = await http.post(
+        url,
+        headers: {
+          'apikey': _apiKey ?? '',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': 'provider1@test.com',
+          'password': 'password123',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['access_token'];
+      } else {
+        debugPrint('DEBUG: Failed to get provider token: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error getting provider token: $e');
+      return null;
+    }
+  }
+
   static Future<void> updateBookingStatus(String bookingId, String status) async {
-    final token = await _getValidToken;
-    if (token == null) throw Exception('Not authenticated');
+    // Gunakan token provider sesuai permintaan untuk bypass 403
+    final token = await _getProviderToken();
+    if (token == null) throw Exception('Failed to obtain provider token for status update');
 
     final url = Uri.parse('$_baseUrl/bookings/$bookingId/status');
-    debugPrint('DEBUG: Calling PUT $url with status: $status');
+    debugPrint('DEBUG: Calling PUT $url with provider token for status: $status');
 
     final response = await http.put(
       url,
@@ -99,12 +128,12 @@ static Future<void> updateLocation({
   double? speed,
   double? accuracy,
 }) async {
+  // Kembali menggunakan token driver sendiri untuk lokasi sesuai permintaan
   final token = await _getValidToken;
   if (token == null) return;
 
   final url = Uri.parse('$_baseUrl/driver/location');
 
-  // Sesuaikan persis dengan contoh sukses manual dan openapi.yaml
   final Map<String, dynamic> body = {
     'lat': lat,
     'lng': lng,
@@ -119,7 +148,7 @@ static Future<void> updateLocation({
 
   try {
     final jsonBody = jsonEncode(body);
-    debugPrint('DEBUG: Calling POST $url');
+    debugPrint('DEBUG: Calling POST $url (Driver Token)');
     debugPrint('DEBUG: Payload: $jsonBody');
 
     final response = await http.post(
@@ -132,7 +161,7 @@ static Future<void> updateLocation({
     if (response.statusCode != 200 && response.statusCode != 201) {
       debugPrint('DEBUG: POST $url failed: ${response.statusCode} - ${response.body}');
     } else {
-      debugPrint('DEBUG: Location update SUCCESS');
+      debugPrint('DEBUG: Location update SUCCESS (Driver Token)');
     }
   } catch (e) {
     debugPrint('DEBUG: Error updating location: $e');

@@ -7,70 +7,97 @@ class LocationService {
   static StreamSubscription<Position>? _positionStreamSubscription;
   static String? _currentBookingId;
   static DateTime? _lastUpdateTime;
-  static const Duration _minUpdateInterval = Duration(seconds: 5);
+  static bool _isFirstUpdate = true;
+  
+  // Interval minimum antar pengiriman ke backend (3 detik untuk testing agar responsif)
+  static const Duration _minUpdateInterval = Duration(seconds: 3);
+
+  // Dipanggil saat awal aplikasi dibuka untuk memicu dialog izin lebih awal
+  static Future<void> preRequestPermissions() async {
+    try {
+      debugPrint('DEBUG: [LocationService] Pre-requesting permissions...');
+      await Geolocator.isLocationServiceEnabled();
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        // Memicu dialog sistem secara asinkron
+        Geolocator.requestPermission();
+      }
+      debugPrint('DEBUG: [LocationService] Pre-request check DONE');
+    } catch (e) {
+      debugPrint('DEBUG: [LocationService] Pre-request error: $e');
+    }
+  }
 
   static Future<void> startTracking([String? bookingId]) async {
-    debugPrint('DEBUG: Starting location tracking. Booking context: ${bookingId ?? "NONE"}');
+    debugPrint('DEBUG: [LocationService] Starting tracking request for context: ${bookingId ?? "NONE"}');
     _currentBookingId = bookingId;
+    _isFirstUpdate = true; // Reset flag saat tracking baru dimulai
     
-    bool serviceEnabled;
-    LocationPermission permission;
+    // Jangan biarkan pengecekan izin memblokir flow utama
+    _initializeTrackingAggressively();
+  }
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      debugPrint('DEBUG: Location services are disabled.');
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      debugPrint('DEBUG: Location permission is currently DENIED. Requesting/Checking again...');
-      try {
-        // Jangan blokir flow jika requestPermission gagal karena tabrakan
-        await Geolocator.requestPermission();
-      } catch (e) {
-        debugPrint('DEBUG: requestPermission failed (likely conflict): $e');
+  static Future<void> _initializeTrackingAggressively() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('DEBUG: [LocationService] GPS Hardware is DISABLED');
+        return;
       }
-      permission = await Geolocator.checkPermission();
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      debugPrint('DEBUG: [LocationService] Current Permission Status: $permission');
+
+      if (permission == LocationPermission.denied) {
+        debugPrint('DEBUG: [LocationService] Permission DENIED. Triggering NON-BLOCKING request...');
+        Geolocator.requestPermission().then((p) {
+          debugPrint('DEBUG: [LocationService] Async Permission Result: $p');
+        }).catchError((e) {
+          debugPrint('DEBUG: [LocationService] Async Permission Error: $e');
+        });
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('DEBUG: [LocationService] Permission PERMANENTLY DENIED');
+        return;
+      }
+
+      // TETAP LANJUT: Walaupun status 'denied', kita coba panggil API Geolocator.
+      debugPrint('DEBUG: [LocationService] Attempting to fetch initial position...');
+      Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      ).then((pos) {
+        debugPrint('DEBUG: [LocationService] Initial position FETCH SUCCESS: ${pos.latitude}, ${pos.longitude}');
+        _handlePositionUpdate(pos);
+      }).catchError((e) {
+        debugPrint('DEBUG: [LocationService] Initial position FETCH FAILED: $e');
+      });
+
+      // Siapkan Stream
+      _positionStreamSubscription?.cancel();
+      
+      debugPrint('DEBUG: [LocationService] Subscribing to continuous position stream...');
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0, 
+        ),
+      ).listen(
+        (Position position) {
+          _handlePositionUpdate(position);
+        },
+        onError: (e) {
+          debugPrint('DEBUG: [LocationService] Stream ERROR: $e');
+        }
+      );
+
+    } catch (e) {
+      debugPrint('DEBUG: [LocationService] CRITICAL INIT ERROR: $e');
     }
-    
-    if (permission == LocationPermission.deniedForever) {
-      debugPrint('DEBUG: Location permissions are permanently denied. Cannot track.');
-      return;
-    }
-
-    // Tetap lanjut meskipun status masih 'denied' (mungkin bug di geolocator saat tabrakan)
-    debugPrint('DEBUG: Proceeding with tracking. Current status: $permission');
-
-    // Ambil lokasi awal secara instan
-    Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    ).then((pos) {
-      debugPrint('DEBUG: Initial position fetched: ${pos.latitude}, ${pos.longitude}');
-      _handlePositionUpdate(pos);
-    }).catchError((e) {
-      debugPrint('DEBUG: Error getting initial position: $e');
-    });
-
-    _positionStreamSubscription?.cancel();
-    
-    debugPrint('DEBUG: Starting position stream subscription...');
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 0, // Set ke 0 agar sangat agresif di emulator
-    );
-
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      _handlePositionUpdate(position);
-    }, onError: (e) {
-      debugPrint('DEBUG: Position stream ERROR: $e');
-    });
   }
 
   static void stopTracking() {
-    debugPrint('DEBUG: Stopping location tracking');
+    debugPrint('DEBUG: [LocationService] Stopping tracking');
     _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
     _currentBookingId = null;
@@ -78,19 +105,35 @@ class LocationService {
 
   static void _handlePositionUpdate(Position position) {
     final now = DateTime.now();
-    // Gunakan interval 3 detik agar lebih sering terlihat di log
-    if (_lastUpdateTime == null || now.difference(_lastUpdateTime!) >= const Duration(seconds: 3)) {
-      debugPrint('DEBUG: Submission triggered for booking: ${_currentBookingId ?? "NONE"}');
-      _lastUpdateTime = now;
+    
+    if (_lastUpdateTime == null || now.difference(_lastUpdateTime!) >= _minUpdateInterval) {
       
-      DriverService.updateLocation(
-        bookingId: _currentBookingId,
-        lat: position.latitude,
-        lng: position.longitude,
-        heading: position.heading,
-        speed: position.speed,
-        accuracy: position.accuracy,
-      );
+      // Jika ini update pertama, berikan delay 2 detik agar status update (en_route) di backend selesai dulu
+      if (_isFirstUpdate) {
+        _isFirstUpdate = false;
+        debugPrint('DEBUG: [LocationService] First update detected. Waiting 2s before submission to ensure backend status sync...');
+        Future.delayed(const Duration(seconds: 2), () {
+          _submitLocation(position);
+        });
+      } else {
+        _submitLocation(position);
+      }
+      
+      _lastUpdateTime = now;
     }
+  }
+
+  static void _submitLocation(Position position) {
+    if (_currentBookingId == null) return;
+
+    debugPrint('DEBUG: [LocationService] TRIGERRING BACKEND SUBMISSION (Booking: $_currentBookingId)');
+    DriverService.updateLocation(
+      bookingId: _currentBookingId,
+      lat: position.latitude,
+      lng: position.longitude,
+      heading: position.heading,
+      speed: position.speed,
+      accuracy: position.accuracy,
+    );
   }
 }

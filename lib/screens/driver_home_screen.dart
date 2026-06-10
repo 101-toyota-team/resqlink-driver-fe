@@ -45,6 +45,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     // Berikan sedikit jeda atau cek session sebelum memulai polling untuk menghindari 401 saat startup
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startAssignmentPolling();
+      // Pre-request izin lokasi agar tidak menghambat saat mulai penugasan
+      LocationService.preRequestPermissions();
     });
   }
 
