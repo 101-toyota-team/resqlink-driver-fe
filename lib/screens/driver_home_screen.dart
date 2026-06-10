@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/driver_service.dart';
+import '../services/location_service.dart';
 import '../themes/app_typography.dart';
 import '../models/booking.dart';
 import 'login_screen.dart';

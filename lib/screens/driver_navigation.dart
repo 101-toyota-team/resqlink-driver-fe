@@ -68,8 +68,10 @@ class _DriverNavigationState extends State<DriverNavigation> {
       }
 
       if (nextStep == 2 || nextStep == 3) {
+        // Mulai tracking hanya saat tugas aktif (en_route atau to_hospital)
         LocationService.startTracking(_activeBooking!.id);
       } else {
+        // Stop tracking di luar tahap tugas aktif
         LocationService.stopTracking();
       }
     }

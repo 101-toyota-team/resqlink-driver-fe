@@ -45,14 +45,10 @@ class DriverService {
   }
 
   static Map<String, String> _getHeaders(String token) {
-    final headers = {
+    return {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
     };
-    if (_apiKey != null) {
-      headers['apikey'] = _apiKey!;
-    }
-    return headers;
   }
 
   static Future<List<dynamic>> getDriverAssignments() async {
@@ -95,51 +91,53 @@ class DriverService {
       throw Exception('Failed to update booking status: ${response.statusCode} - ${response.body}');
     }
   }
+static Future<void> updateLocation({
+  String? bookingId,
+  required double lat,
+  required double lng,
+  double? heading,
+  double? speed,
+  double? accuracy,
+}) async {
+  final token = await _getValidToken;
+  if (token == null) return;
 
-  static Future<void> updateLocation({
-    required String bookingId,
-    required double lat,
-    required double lng,
-    double? heading,
-    double? speed,
-    double? accuracy,
-  }) async {
-    final token = await _getValidToken;
-    if (token == null) return;
+  final url = Uri.parse('$_baseUrl/driver/location');
 
-    final url = Uri.parse('$_baseUrl/driver/location');
-    
-    // Pastikan data yang dikirim adalah tipe data yang benar (double)
-    final body = {
-      'booking_id': bookingId,
-      'lat': lat,
-      'lng': lng,
-      'heading': heading ?? 0.0,
-      'speed': speed ?? 0.0,
-      'accuracy': accuracy ?? 0.0,
-    };
+  // Sesuaikan persis dengan contoh sukses manual dan openapi.yaml
+  final Map<String, dynamic> body = {
+    'lat': lat,
+    'lng': lng,
+    'heading': heading ?? 0.0,
+    'speed': speed ?? 0.0,
+    'accuracy': accuracy ?? 0.0,
+  };
 
-    try {
-      final jsonBody = jsonEncode(body);
-      debugPrint('DEBUG: Calling POST $url');
-      debugPrint('DEBUG: Payload: $jsonBody');
-      
-      final response = await http.post(
-        url,
-        headers: _getHeaders(token),
-        body: jsonBody,
-      );
-
-      debugPrint('DEBUG: POST $url returned ${response.statusCode}');
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        debugPrint('DEBUG: POST $url failed: ${response.statusCode} - ${response.body}');
-      } else {
-        debugPrint('DEBUG: Location update SUCCESS');
-      }
-    } catch (e) {
-      debugPrint('DEBUG: Error updating location: $e');
-    }
+  if (bookingId != null) {
+    body['booking_id'] = bookingId;
   }
+
+  try {
+    final jsonBody = jsonEncode(body);
+    debugPrint('DEBUG: Calling POST $url');
+    debugPrint('DEBUG: Payload: $jsonBody');
+
+    final response = await http.post(
+      url,
+      headers: _getHeaders(token),
+      body: jsonBody,
+    );
+
+    debugPrint('DEBUG: POST $url returned ${response.statusCode}');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      debugPrint('DEBUG: POST $url failed: ${response.statusCode} - ${response.body}');
+    } else {
+      debugPrint('DEBUG: Location update SUCCESS');
+    }
+  } catch (e) {
+    debugPrint('DEBUG: Error updating location: $e');
+  }
+}
 
   static Future<void> updateStatus(bool online) async {
     final token = await _getValidToken;
