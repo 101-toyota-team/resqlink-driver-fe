@@ -29,9 +29,10 @@ class LocationService {
   }
 
   static Future<void> startTracking([String? bookingId]) async {
-    debugPrint('DEBUG: [LocationService] Starting tracking request for context: ${bookingId ?? "NONE"}');
+    debugPrint('DEBUG: [LocationService] Starting tracking for booking: ${bookingId ?? "NONE"}');
     _currentBookingId = bookingId;
     _isFirstUpdate = true; // Reset flag saat tracking baru dimulai
+    _lastUpdateTime = null; // Reset last update time
     
     // Jangan biarkan pengecekan izin memblokir flow utama
     _initializeTrackingAggressively();
@@ -101,11 +102,14 @@ class LocationService {
     _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
     _currentBookingId = null;
+    _lastUpdateTime = null;
+    _isFirstUpdate = true;
   }
 
   static void _handlePositionUpdate(Position position) {
     final now = DateTime.now();
     
+    // Throttle: hanya kirim jika sudah melewati interval minimum
     if (_lastUpdateTime == null || now.difference(_lastUpdateTime!) >= _minUpdateInterval) {
       
       // Jika ini update pertama, berikan delay 2 detik agar status update (en_route) di backend selesai dulu
@@ -120,13 +124,18 @@ class LocationService {
       }
       
       _lastUpdateTime = now;
+    } else {
+      debugPrint('DEBUG: [LocationService] Skipping location update (throttled)');
     }
   }
 
   static void _submitLocation(Position position) {
-    if (_currentBookingId == null) return;
+    if (_currentBookingId == null) {
+      debugPrint('DEBUG: [LocationService] No active booking, skipping location submission');
+      return;
+    }
 
-    debugPrint('DEBUG: [LocationService] TRIGERRING BACKEND SUBMISSION (Booking: $_currentBookingId)');
+    debugPrint('DEBUG: [LocationService] SUBMITTING location to backend (Booking: $_currentBookingId)');
     DriverService.updateLocation(
       bookingId: _currentBookingId,
       lat: position.latitude,

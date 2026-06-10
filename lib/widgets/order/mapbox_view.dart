@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import '../../services/driver_service.dart';
 import '../../themes/app_colors.dart';
 
 class MapboxView extends StatefulWidget {
   final String text;
   final int currentStep;
+  final String? bookingId;
 
   const MapboxView({
     super.key,
     required this.text,
     this.currentStep = 0,
+    this.bookingId,
   });
 
   @override
@@ -31,6 +34,10 @@ class _MapboxViewState extends State<MapboxView> {
 
   StreamSubscription<geo.Position>? _positionStream;
   geo.Position? _currentPosition;
+  
+  // Throttle untuk menghindari spam API
+  DateTime? _lastBackendUpdate;
+  static const Duration _updateInterval = Duration(seconds: 5);
 
   // Mock Coordinates
   final Position _pickupPosition = Position(106.8244, -6.1820); // Near Sarinah
@@ -85,6 +92,10 @@ class _MapboxViewState extends State<MapboxView> {
         setState(() {
           _currentPosition = initialPosition;
         });
+        
+        // Kirim lokasi awal ke backend
+        _sendLocationToBackend(initialPosition);
+        
         _updateMapState();
       }
 
@@ -99,19 +110,47 @@ class _MapboxViewState extends State<MapboxView> {
       _positionStream = geo.Geolocator.getPositionStream(
         locationSettings: const geo.LocationSettings(
           accuracy: geo.LocationAccuracy.bestForNavigation,
-          distanceFilter: 2, // Lebih sensitif (2 meter)
+          distanceFilter: 5, // Update setiap 5 meter
         ),
       ).listen((geo.Position position) {
         if (mounted) {
           setState(() {
             _currentPosition = position;
           });
+          
+          // Kirim ke backend setiap kali ada update lokasi
+          _sendLocationToBackend(position);
+          
           _updateMapState();
         }
       });
     } catch (e) {
       debugPrint("Error starting location tracking: $e");
     }
+  }
+  
+  // Method untuk mengirim lokasi ke backend
+  void _sendLocationToBackend(geo.Position position) {
+    // Cek throttle untuk menghindari terlalu banyak request
+    final now = DateTime.now();
+    if (_lastBackendUpdate != null && 
+        now.difference(_lastBackendUpdate!) < _updateInterval) {
+      return;
+    }
+    
+    _lastBackendUpdate = now;
+    
+    // Panggil service untuk update lokasi
+    DriverService.updateLocation(
+      bookingId: widget.bookingId,
+      lat: position.latitude,
+      lng: position.longitude,
+      heading: position.heading,
+      speed: position.speed,
+      accuracy: position.accuracy,
+    );
+    
+    debugPrint('📍 Location sent to backend: ${position.latitude}, ${position.longitude}');
   }
 
   void _onMapCreated(MapboxMap mapboxMap) async {

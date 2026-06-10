@@ -46,7 +46,11 @@ class DriverMainScreen extends StatelessWidget {
       body: Stack(
         children: [
           // Background Map
-          MapboxView(text: _getMapText(), currentStep: currentStep),
+          MapboxView(
+            text: _getMapText(), 
+            currentStep: currentStep,
+            bookingId: booking.id, // ✅ Pass booking ID
+          ),
           
           // Custom Overlay Header (Gojek-like)
           if (currentStep != 1) 
