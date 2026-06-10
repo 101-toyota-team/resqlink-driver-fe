@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/driver_service.dart';
 import '../themes/app_typography.dart';
 import 'login_screen.dart';
 import 'notification_screen.dart';
 import '../../widgets/home/driver_hero_performance_card.dart';
 import '../../widgets/home/driver_ongoing_task_card.dart';
-import '../../widgets/home/driver_standby_radar_button.dart';
 import '../../widgets/home/driver_tips_card.dart';
+import '../../widgets/order/order_request_card.dart';
+import '../../themes/app_colors.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final int currentStep;
@@ -73,15 +75,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: widget.currentStep >= 2 
-                    ? DriverOngoingTaskCard(
-                        currentStep: widget.currentStep,
-                        onOpenTaskRoute: widget.onOpenTaskRoute,
-                      )
-                    : DriverStandbyRadarButton(
-                        isStandby: _isStandby,
-                        onSimulateAssignment: widget.onSimulateAssignment,
-                      ),
+                child: _buildMainActionArea(),
               ),
               const SizedBox(height: 24),
               const DriverTipsCard(),
@@ -89,6 +83,62 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMainActionArea() {
+    if (widget.currentStep >= 2) {
+      return DriverOngoingTaskCard(
+        currentStep: widget.currentStep,
+        onOpenTaskRoute: widget.onOpenTaskRoute,
+      );
+    }
+
+    if (_isStandby) {
+      // Tampilan "Penugasan Baru" yang langsung muncul
+      return OrderRequestCard(
+        onAccept: widget.onSimulateAssignment,
+      );
+    }
+
+    // Tampilan saat Offline
+    return Container(
+      padding: const EdgeInsets.all(32),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F3F5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.power_settings_new_rounded, size: 40, color: Color(0xFFADB5BD)),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Status Anda Offline",
+            style: AppTypography.h3.copyWith(color: const Color(0xFF495057)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Aktifkan status AKTIF di atas untuk mulai menerima penugasan darurat secara langsung.",
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(color: const Color(0xFF868E96), fontSize: 13),
+          ),
+        ],
       ),
     );
   }
@@ -160,6 +210,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 value: _isStandby,
                 onChanged: (value) {
                   setState(() { _isStandby = value; });
+                  // Sync dengan backend di background tanpa memblokir UI
+                  DriverService.updateStatus(value).catchError((e) {
+                    debugPrint('Gagal sinkronisasi status ke backend: $e');
+                  });
                 },
                 activeThumbColor: const Color(0xFF00AA13),
                 activeTrackColor: const Color(0xFF00AA13).withValues(alpha: 0.2),

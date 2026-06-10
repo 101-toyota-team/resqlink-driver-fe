@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:resqlink_driver/screens/driver_main_screen.dart';
 import 'package:resqlink_driver/screens/driver_home_screen.dart';
 import 'package:resqlink_driver/screens/driver_activity_screen.dart';
+import 'package:resqlink_driver/services/location_service.dart';
 import '../../widgets/driver_bottom_nav.dart'; 
 import '../../widgets/order/order_request_card.dart';
 
@@ -23,6 +24,22 @@ class _DriverNavigationState extends State<DriverNavigation> {
   // 3: Menuju Rumah Sakit (Sedang di Jalan)
   // 4: Selesaikan Pembayaran (QRIS)
   int _currentDriverStep = 0;
+  String? _currentBookingId;
+
+  void _onStepChanged(int nextStep) {
+    setState(() {
+      _currentDriverStep = nextStep;
+      
+      if (_currentDriverStep == 2 || _currentDriverStep == 3) {
+        // Mulai polling lokasi ketika misi aktif
+        // Gunakan ID booking jika ada, atau placeholder untuk simulasi
+        LocationService.startTracking(_currentBookingId ?? 'SIMULATED_BOOKING_ID');
+      } else if (_currentDriverStep == 0 || _currentDriverStep == 4) {
+        // Berhenti polling lokasi saat misi selesai atau masuk pembayaran
+        LocationService.stopTracking();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +51,8 @@ class _DriverNavigationState extends State<DriverNavigation> {
           DriverHomeScreen(
             currentStep: _currentDriverStep,
             onSimulateAssignment: () {
-              _showNewAssignmentDialog();
+              _onStepChanged(2); // Langsung ke tahap Menuju Lokasi Pasien
+              _navigateToMainRoute(); // Pindah ke halaman navigasi aktif
             },
             onOpenTaskRoute: () {
               _navigateToMainRoute();
@@ -66,9 +84,7 @@ class _DriverNavigationState extends State<DriverNavigation> {
         child: OrderRequestCard(
           onAccept: () {
             Navigator.pop(context); // Tutup Dialog
-            setState(() {
-              _currentDriverStep = 2; // Langsung ke tahap Menuju Lokasi Pasien
-            });
+            _onStepChanged(2); // Langsung ke tahap Menuju Lokasi Pasien
             _navigateToMainRoute(); // Pindah ke halaman navigasi aktif
           },
         ),
@@ -87,9 +103,7 @@ class _DriverNavigationState extends State<DriverNavigation> {
                 currentStep: _currentDriverStep,
                 onStepChanged: (nextStep) {
                   // 1. Update State Utama di Parent Layout
-                  setState(() {
-                    _currentDriverStep = nextStep;
-                  });
+                  _onStepChanged(nextStep);
                   
                   // 2. Update State Lokal di dalam halaman yang di-push agar langsung berubah tampilannya
                   setModalState(() {});
