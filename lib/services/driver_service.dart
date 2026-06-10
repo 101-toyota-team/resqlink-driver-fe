@@ -19,29 +19,40 @@ class DriverService {
     final auth = Supabase.instance.client.auth;
     var session = auth.currentSession;
     
-    if (session == null) return null;
+    if (session == null) {
+      debugPrint('DEBUG: _getValidToken: NO SESSION FOUND');
+      return null;
+    }
 
     // Jika token kedaluwarsa atau hampir habis (misal dalam 60 detik), refresh session
     if (session.isExpired || (session.expiresAt != null && 
         DateTime.fromMillisecondsSinceEpoch(session.expiresAt! * 1000)
             .difference(DateTime.now()).inSeconds < 60)) {
+      debugPrint('DEBUG: _getValidToken: SESSION EXPIRED or expiring soon. Refreshing...');
       try {
         final response = await auth.refreshSession();
         session = response.session;
+        debugPrint('DEBUG: _getValidToken: REFRESH SUCCESS');
       } catch (e) {
-        debugPrint('Error refreshing session: $e');
+        debugPrint('DEBUG: _getValidToken: REFRESH FAILED: $e');
         return null;
       }
+    } else {
+      debugPrint('DEBUG: _getValidToken: TOKEN STILL VALID');
     }
     
     return session?.accessToken;
   }
 
   static Map<String, String> _getHeaders(String token) {
-    return {
+    final headers = {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
     };
+    if (_apiKey != null) {
+      headers['apikey'] = _apiKey!;
+    }
+    return headers;
   }
 
   static Future<List<dynamic>> getDriverAssignments() async {
@@ -97,25 +108,33 @@ class DriverService {
     if (token == null) return;
 
     final url = Uri.parse('$_baseUrl/driver/location');
+    
+    // Pastikan data yang dikirim adalah tipe data yang benar (double)
     final body = {
       'booking_id': bookingId,
       'lat': lat,
       'lng': lng,
-      'heading': heading,
-      'speed': speed,
-      'accuracy': accuracy,
+      'heading': heading ?? 0.0,
+      'speed': speed ?? 0.0,
+      'accuracy': accuracy ?? 0.0,
     };
 
     try {
-      debugPrint('DEBUG: Calling POST $url for booking $bookingId');
+      final jsonBody = jsonEncode(body);
+      debugPrint('DEBUG: Calling POST $url');
+      debugPrint('DEBUG: Payload: $jsonBody');
+      
       final response = await http.post(
         url,
         headers: _getHeaders(token),
-        body: jsonEncode(body),
+        body: jsonBody,
       );
 
-      if (response.statusCode != 200) {
+      debugPrint('DEBUG: POST $url returned ${response.statusCode}');
+      if (response.statusCode != 200 && response.statusCode != 201) {
         debugPrint('DEBUG: POST $url failed: ${response.statusCode} - ${response.body}');
+      } else {
+        debugPrint('DEBUG: Location update SUCCESS');
       }
     } catch (e) {
       debugPrint('DEBUG: Error updating location: $e');

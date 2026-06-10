@@ -19,32 +19,39 @@ class LocationService {
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       debugPrint('DEBUG: Location services are disabled.');
-      return Future.error('Location services are disabled.');
+      return;
     }
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      debugPrint('DEBUG: Location permission denied, requesting...');
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        debugPrint('DEBUG: Location permission denied again.');
-        return Future.error('Location permissions are denied');
+      debugPrint('DEBUG: Location permission is currently DENIED. Requesting now...');
+      try {
+        permission = await Geolocator.requestPermission();
+      } catch (e) {
+        debugPrint('DEBUG: Exception while requesting permission: $e');
+        // Tetap coba cek permission lagi, siapa tahu sudah diberikan via dialog sistem lain
+        permission = await Geolocator.checkPermission();
       }
     }
     
     if (permission == LocationPermission.deniedForever) {
       debugPrint('DEBUG: Location permissions are permanently denied.');
-      return Future.error('Location permissions are permanently denied');
+      return;
     }
 
-    debugPrint('DEBUG: Location permissions granted. Fetching initial position...');
+    if (permission == LocationPermission.denied) {
+      debugPrint('DEBUG: Location permission is still denied after request.');
+      return;
+    }
+
+    debugPrint('DEBUG: Location permission is OK ($permission). Fetching initial position...');
 
     // Ambil lokasi awal secara instan dan submit ke backend
     try {
       final initialPosition = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-      debugPrint('DEBUG: Initial position fetched: ${initialPosition.latitude}, ${initialPosition.longitude}');
+      debugPrint('DEBUG: Initial position SUCCESS: ${initialPosition.latitude}, ${initialPosition.longitude}');
       _handlePositionUpdate(initialPosition);
     } catch (e) {
       debugPrint('DEBUG: Error getting initial position: $e');
@@ -52,7 +59,7 @@ class LocationService {
 
     _positionStreamSubscription?.cancel();
     
-    debugPrint('DEBUG: Starting position stream subscription...');
+    debugPrint('DEBUG: Starting continuous position stream...');
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 2,
@@ -62,6 +69,8 @@ class LocationService {
       locationSettings: locationSettings,
     ).listen((Position position) {
       _handlePositionUpdate(position);
+    }, onError: (e) {
+      debugPrint('DEBUG: Position stream ERROR: $e');
     });
   }
 
