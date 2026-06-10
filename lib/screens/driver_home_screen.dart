@@ -1,24 +1,28 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/driver_service.dart';
 import '../themes/app_typography.dart';
+import '../models/booking.dart';
 import 'login_screen.dart';
 import 'notification_screen.dart';
-import '../../widgets/home/driver_hero_performance_card.dart';
-import '../../widgets/home/driver_ongoing_task_card.dart';
-import '../../widgets/home/driver_tips_card.dart';
-import '../../widgets/order/order_request_card.dart';
-import '../../themes/app_colors.dart';
+import '../widgets/home/driver_hero_performance_card.dart';
+import '../widgets/home/driver_ongoing_task_card.dart';
+import '../widgets/home/driver_tips_card.dart';
+import '../widgets/order/order_request_card.dart';
+import '../themes/app_colors.dart';
+import '../themes/app_theme.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final int currentStep;
-  final VoidCallback onSimulateAssignment;
+  final Function(Booking) onStartAssignment;
   final VoidCallback onOpenTaskRoute;
 
   const DriverHomeScreen({
     super.key,
     required this.currentStep,
-    required this.onSimulateAssignment,
+    required this.onStartAssignment,
     required this.onOpenTaskRoute,
   });
 
@@ -29,11 +33,35 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _isStandby = false;
   String _driverName = "Mitra ResQLink";
+  List<Booking> _assignments = [];
+  bool _isFetching = false;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _getDriverInfo();
+    // Berikan sedikit jeda atau cek session sebelum memulai polling untuk menghindari 401 saat startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startAssignmentPolling();
+    });
+  }
+
+  void _startAssignmentPolling() {
+    _refreshTimer?.cancel();
+    // Berikan jeda 2 detik untuk memastikan session benar-benar settle setelah hot restart/startup
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        _updateAssignmentsFromServer();
+        _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => _updateAssignmentsFromServer());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   void _getDriverInfo() {
@@ -48,7 +76,50 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  Future<void> _updateAssignmentsFromServer() async {
+    // Cek apakah ada session aktif sebelum sinkronisasi
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null || _isFetching || widget.currentStep >= 2) return;
+    
+    setState(() => _isFetching = true);
+    try {
+      final List<dynamic> data = await DriverService.getDriverAssignments();
+      debugPrint('DEBUG: Fetched ${data.length} assignments from API');
+      
+      final List<Booking> fetched = data.map((j) => Booking.fromJson(j)).toList();
+      
+      if (mounted) {
+        setState(() {
+          // Filter hanya yang statusnya confirmed
+          _assignments = fetched.where((b) => b.status == BookingStatus.confirmed).toList();
+          debugPrint('DEBUG: Found ${_assignments.length} assignments with status CONFIRMED');
+        });
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error updating assignments: $e');
+      // Jika Unauthorized, kosongkan list penugasan
+      if (e.toString().contains('401') && mounted) {
+        setState(() => _assignments = []);
+      }
+    } finally {
+      if (mounted) setState(() => _isFetching = false);
+    }
+  }
+
+  void _toggleStandby(bool value) {
+    setState(() { 
+      _isStandby = value;
+    });
+    // Jangan biarkan error sync status menghentikan UI, tapi tetap log
+    DriverService.updateStatus(value).then((_) {
+      if (value) _updateAssignmentsFromServer();
+    }).catchError((e) {
+      debugPrint('DEBUG: Error sync status: $e');
+    });
+  }
+
   Future<void> _handleLogout() async {
+    _refreshTimer?.cancel();
     await Supabase.instance.client.auth.signOut();
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -64,19 +135,41 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: _updateAssignmentsFromServer,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
             children: [
               _buildTopBar(),
               _buildGreetingSection(),
+              
               const DriverHeroPerformanceCard(),
               const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildMainActionArea(),
-              ),
+
+              // Area Aksi Utama (Tugas Aktif, Penugasan Baru, atau Placeholder Standby)
+              if (widget.currentStep >= 2)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: DriverOngoingTaskCard(
+                    currentStep: widget.currentStep,
+                    onOpenTaskRoute: widget.onOpenTaskRoute,
+                  ),
+                )
+              else if (_assignments.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OrderRequestCard(
+                    booking: _assignments.first,
+                    onAccept: () => widget.onStartAssignment(_assignments.first),
+                  ),
+                )
+              else if (_isStandby)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildStandbyPlaceholder(),
+                ),
+
               const SizedBox(height: 24),
               const DriverTipsCard(),
               const SizedBox(height: 32),
@@ -87,31 +180,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildMainActionArea() {
-    if (widget.currentStep >= 2) {
-      return DriverOngoingTaskCard(
-        currentStep: widget.currentStep,
-        onOpenTaskRoute: widget.onOpenTaskRoute,
-      );
-    }
-
-    if (_isStandby) {
-      // Tampilan "Penugasan Baru" yang langsung muncul
-      return OrderRequestCard(
-        onAccept: widget.onSimulateAssignment,
-      );
-    }
-
-    // Tampilan saat Offline
+  Widget _buildStandbyPlaceholder() {
     return Container(
       padding: const EdgeInsets.all(32),
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -120,23 +199,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F3F5),
+              color: AppColors.primary.withValues(alpha: 0.05),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.power_settings_new_rounded, size: 40, color: Color(0xFFADB5BD)),
+            child: const Icon(Icons.check_circle_outline_rounded, color: AppColors.primary, size: 40),
           ),
           const SizedBox(height: 24),
-          Text(
-            "Status Anda Offline",
-            style: AppTypography.h3.copyWith(color: const Color(0xFF495057)),
-          ),
+          Text("Siap Melayani", style: AppTypography.h3.copyWith(color: AppColors.primary)),
           const SizedBox(height: 8),
           Text(
-            "Aktifkan status AKTIF di atas untuk mulai menerima penugasan darurat secara langsung.",
+            "Anda akan menerima penugasan langsung di sini jika sudah dikonfirmasi oleh provider.",
             textAlign: TextAlign.center,
-            style: AppTypography.body.copyWith(color: const Color(0xFF868E96), fontSize: 13),
+            style: AppTypography.body.copyWith(color: Colors.grey.shade600, fontSize: 13),
           ),
         ],
       ),
@@ -208,13 +284,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               scale: 0.7,
               child: Switch(
                 value: _isStandby,
-                onChanged: (value) {
-                  setState(() { _isStandby = value; });
-                  // Sync dengan backend di background tanpa memblokir UI
-                  DriverService.updateStatus(value).catchError((e) {
-                    debugPrint('Gagal sinkronisasi status ke backend: $e');
-                  });
-                },
+                onChanged: _toggleStandby,
                 activeThumbColor: const Color(0xFF00AA13),
                 activeTrackColor: const Color(0xFF00AA13).withValues(alpha: 0.2),
                 inactiveThumbColor: const Color(0xFF9E9E9E),

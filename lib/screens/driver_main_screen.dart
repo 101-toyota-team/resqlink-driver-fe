@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/booking.dart';
 import '../themes/app_colors.dart';
 import '../themes/app_typography.dart';
 import '../widgets/order/order_request_card.dart';
@@ -9,11 +10,13 @@ import '../widgets/order/mapbox_view.dart';
 class DriverMainScreen extends StatelessWidget {
   final int currentStep;
   final ValueChanged<int> onStepChanged;
+  final Booking booking;
 
   const DriverMainScreen({
     super.key,
     required this.currentStep,
     required this.onStepChanged,
+    required this.booking,
   });
 
   @override
@@ -152,8 +155,8 @@ class DriverMainScreen extends StatelessWidget {
 
   String _getTripSubTitle() {
     switch (currentStep) {
-      case 2: return "Jl. Margonda Raya No.124";
-      case 3: return "RS Universitas Indonesia (IGD)";
+      case 2: return booking.pickupAddress;
+      case 3: return booking.destinationAddress;
       default: return "Sedang dalam tugas...";
     }
   }
@@ -162,7 +165,7 @@ class DriverMainScreen extends StatelessWidget {
     switch (currentStep) {
       case 1: return "Mencari rute penugasan...";
       case 2: return "Rute: Menuju Lokasi Pasien 📍";
-      case 3: return "Rute: Menuju RS Universitas Indonesia 🏥";
+      case 3: return "Rute: Menuju Rumah Sakit 🏥";
       default: return "Maps";
     }
   }
@@ -171,12 +174,13 @@ class DriverMainScreen extends StatelessWidget {
     switch (currentStep) {
       case 1:
         return OrderRequestCard(
+          booking: booking,
           onAccept: () => onStepChanged(2),
         );
       case 2:
         return DriverNavigationSheet(
-          passengerName: "Joyney Dissy",
-          notes: "Sesak napas, butuh oksigen",
+          passengerName: booking.patientCondition,
+          notes: "Tipe: ${booking.bookingType.toUpperCase()}",
           buttonText: "Sampai di Penjemputan",
           buttonColor: AppColors.amber,
           onButtonPressed: () => onStepChanged(3),
@@ -184,8 +188,8 @@ class DriverMainScreen extends StatelessWidget {
         );
       case 3:
         return DriverNavigationSheet(
-          passengerName: "Tujuan: RS UI (IGD)",
-          notes: "Kondisi: Stabil dalam pantauan",
+          passengerName: "Tujuan: ${booking.destinationAddress}",
+          notes: "Kondisi: ${booking.patientCondition}",
           buttonText: "Sampai di Rumah Sakit",
           buttonColor: AppColors.primary,
           onButtonPressed: () => onStepChanged(4),
@@ -196,4 +200,3 @@ class DriverMainScreen extends StatelessWidget {
     }
   }
 }
-

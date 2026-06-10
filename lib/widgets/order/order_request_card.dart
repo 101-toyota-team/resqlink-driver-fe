@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 import '../../themes/app_colors.dart';
 import '../../themes/app_typography.dart';
+import '../../models/booking.dart';
 
 class OrderRequestCard extends StatelessWidget {
+  final Booking booking;
   final VoidCallback onAccept;
 
-  const OrderRequestCard({super.key, required this.onAccept});
+  const OrderRequestCard({
+    super.key, 
+    required this.booking,
+    required this.onAccept
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 40,
-            offset: const Offset(0, 20),
-          ),
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
           ),
         ],
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.1), width: 1.5),
@@ -41,7 +41,6 @@ class OrderRequestCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(100),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -49,7 +48,7 @@ class OrderRequestCard extends StatelessWidget {
                   const Icon(Icons.emergency_rounded, color: AppColors.primary, size: 16),
                   const SizedBox(width: 8),
                   Text(
-                    "TUGAS DARURAT BARU",
+                    "PENUGASAN AKTIF",
                     style: AppTypography.captionSmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w900,
@@ -61,40 +60,16 @@ class OrderRequestCard extends StatelessWidget {
             ),
           ),
           
-          // Header: Type & Fare
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Ambulans Gawat Darurat", 
-                      style: AppTypography.h3.copyWith(fontSize: 18)
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Kategori: Prioritas Tinggi",
-                      style: AppTypography.caption.copyWith(color: AppColors.amber, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    "Rp300.000", 
-                    style: AppTypography.h2.copyWith(color: AppColors.primary, fontSize: 22)
-                  ),
-                  Text(
-                    "Estimasi Tarif",
-                    style: AppTypography.captionSmall.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ],
+          // Header: Type
+          Text(
+            booking.patientCondition, 
+            style: AppTypography.h3.copyWith(fontSize: 20),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            "Layanan: ${booking.bookingType.toUpperCase()}",
+            style: AppTypography.caption.copyWith(color: AppColors.textGrey, fontWeight: FontWeight.w700),
           ),
           
           const SizedBox(height: 24),
@@ -114,13 +89,6 @@ class OrderRequestCard extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: AppColors.gradient,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               ),
               child: ElevatedButton(
                 onPressed: onAccept,
@@ -134,24 +102,13 @@ class OrderRequestCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Terima Penugasan", 
+                      "Mulai Jalankan Tugas", 
                       style: AppTypography.button.copyWith(fontSize: 16)
                     ),
                     const SizedBox(width: 12),
-                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                    const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
                   ],
                 ),
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 12),
-          Center(
-            child: TextButton(
-              onPressed: () {},
-              child: Text(
-                "Abaikan Tugas",
-                style: AppTypography.label.copyWith(color: AppColors.textGrey),
               ),
             ),
           ),
@@ -183,9 +140,9 @@ class OrderRequestCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLocationItem("JEMPUT", "Jl. Margonda Raya No.124", AppColors.textDark),
+              _buildLocationItem("JEMPUT", booking.pickupAddress, AppColors.textDark),
               const SizedBox(height: 24),
-              _buildLocationItem("TUJUAN", "RS Universitas Indonesia", AppColors.textDark),
+              _buildLocationItem("TUJUAN", booking.destinationAddress, AppColors.textDark),
             ],
           ),
         ),
