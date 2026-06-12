@@ -35,9 +35,8 @@ class _MapboxViewState extends State<MapboxView> {
   StreamSubscription<geo.Position>? _positionStream;
   geo.Position? _currentPosition;
   
-  // Throttle untuk menghindari spam API
-  DateTime? _lastBackendUpdate;
-  static const Duration _updateInterval = Duration(seconds: 5);
+  // Kontrol Kamera
+  bool _isAutoCenter = true;
 
   // Mock Coordinates
   final Position _pickupPosition = Position(106.8244, -6.1820); // Near Sarinah
@@ -93,9 +92,6 @@ class _MapboxViewState extends State<MapboxView> {
           _currentPosition = initialPosition;
         });
         
-        // Kirim lokasi awal ke backend
-        _sendLocationToBackend(initialPosition);
-        
         _updateMapState();
       }
 
@@ -118,9 +114,6 @@ class _MapboxViewState extends State<MapboxView> {
             _currentPosition = position;
           });
           
-          // Kirim ke backend setiap kali ada update lokasi
-          _sendLocationToBackend(position);
-          
           _updateMapState();
         }
       });
@@ -128,29 +121,12 @@ class _MapboxViewState extends State<MapboxView> {
       debugPrint("Error starting location tracking: $e");
     }
   }
-  
-  // Method untuk mengirim lokasi ke backend
-  void _sendLocationToBackend(geo.Position position) {
-    // Cek throttle untuk menghindari terlalu banyak request
-    final now = DateTime.now();
-    if (_lastBackendUpdate != null && 
-        now.difference(_lastBackendUpdate!) < _updateInterval) {
-      return;
-    }
-    
-    _lastBackendUpdate = now;
-    
-    // Panggil service untuk update lokasi
-    DriverService.updateLocation(
-      bookingId: widget.bookingId,
-      lat: position.latitude,
-      lng: position.longitude,
-      heading: position.heading,
-      speed: position.speed,
-      accuracy: position.accuracy,
-    );
-    
-    debugPrint('📍 Location sent to backend: ${position.latitude}, ${position.longitude}');
+
+  void _recenter() {
+    setState(() {
+      _isAutoCenter = true;
+    });
+    _updateMapState();
   }
 
   void _onMapCreated(MapboxMap mapboxMap) async {
@@ -287,8 +263,8 @@ class _MapboxViewState extends State<MapboxView> {
       }
     }
 
-    // 3. Fly to Driver Position (Hanya jika belum center atau sedang navigasi)
-    if (!_hasInitialCenter || widget.currentStep >= 2) {
+    // 3. Fly to Driver Position (Hanya jika _isAutoCenter aktif)
+    if (_isAutoCenter && (!_hasInitialCenter || widget.currentStep >= 2)) {
       _mapboxMap?.flyTo(
         CameraOptions(
           center: Point(coordinates: driverPos), 
@@ -316,10 +292,32 @@ class _MapboxViewState extends State<MapboxView> {
               center: Point(coordinates: Position(106.8272, -6.1751)), // Default: Jakarta
               zoom: 12.0,
             ),
+            onScrollListener: (MapContentGestureContext context) {
+              // Jika user menggeser peta, matikan auto-center
+              if (_isAutoCenter) {
+                setState(() {
+                  _isAutoCenter = false;
+                });
+              }
+            },
           ),
           if (_currentPosition == null)
             const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          
+          // Tombol Recenter (Muncul saat auto-center mati)
+          if (!_isAutoCenter && _currentPosition != null)
+            Positioned(
+              bottom: widget.currentStep >= 2 ? 260 : 32, 
+              right: 16,
+              child: FloatingActionButton(
+                heroTag: 'recenter_fab',
+                mini: true,
+                backgroundColor: Colors.white,
+                onPressed: _recenter,
+                child: const Icon(Icons.my_location_rounded, color: AppColors.primary),
+              ),
             ),
         ],
       ),
