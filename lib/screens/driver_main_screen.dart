@@ -50,6 +50,7 @@ class DriverMainScreen extends StatelessWidget {
             text: _getMapText(), 
             currentStep: currentStep,
             bookingId: booking.id, // ✅ Pass booking ID
+            booking: booking,      // ✅ Pass booking object
           ),
           
           // Custom Overlay Header (Gojek-like)

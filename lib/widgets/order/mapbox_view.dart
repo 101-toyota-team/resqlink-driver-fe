@@ -7,16 +7,20 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../services/driver_service.dart';
 import '../../themes/app_colors.dart';
 
+import '../../models/booking.dart';
+
 class MapboxView extends StatefulWidget {
   final String text;
   final int currentStep;
   final String? bookingId;
+  final Booking? booking;
 
   const MapboxView({
     super.key,
     required this.text,
     this.currentStep = 0,
     this.bookingId,
+    this.booking,
   });
 
   @override
@@ -38,9 +42,14 @@ class _MapboxViewState extends State<MapboxView> {
   // Kontrol Kamera
   bool _isAutoCenter = true;
 
-  // Mock Coordinates
-  final Position _pickupPosition = Position(106.8244, -6.1820); // Near Sarinah
-  final Position _hospitalPosition = Position(106.8272, -6.1751); // Monas area
+  // Pickup & Hospital coordinates from backend (fallback to default if null)
+  Position get _pickupPosition => widget.booking != null 
+    ? Position(widget.booking!.pickupLng, widget.booking!.pickupLat)
+    : Position(106.8244, -6.1820);
+
+  Position get _hospitalPosition => widget.booking != null
+    ? Position(widget.booking!.destinationLng, widget.booking!.destinationLat)
+    : Position(106.8272, -6.1751);
 
   @override
   void initState() {

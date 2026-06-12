@@ -71,10 +71,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
       setState(() {
-        _driverName = user.userMetadata?['full_name'] ?? 
-                      user.userMetadata?['name'] ?? 
-                      user.email?.split('@')[0] ?? 
-                      "Mitra ResQLink";
+        _driverName = "Wildan Arifin";
       });
     }
   }
